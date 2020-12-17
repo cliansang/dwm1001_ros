@@ -91,6 +91,7 @@ class dwm1001_localizer:
             while not rospy.is_shutdown():
                 # just read everything from serial port
                 serialReadLine = serialPortDWM1001.read_until()
+                rospy.loginfo(serialReadLine) # just for debug
 
                 try:
                     self.pubblishCoordinatesIntoTopics(self.splitByComma(serialReadLine))
@@ -111,7 +112,7 @@ class dwm1001_localizer:
             serialPortDWM1001.write(DWM1001_API_COMMANDS.RESET)
             serialPortDWM1001.write(DWM1001_API_COMMANDS.SINGLE_ENTER)
             rate.sleep()
-            if "reset" in serialReadLine:
+            if "reset".encode() in serialReadLine:
                 rospy.loginfo("succesfully closed ")
                 serialPortDWM1001.close()
 
@@ -124,8 +125,10 @@ class dwm1001_localizer:
         :returns: arrayFromUSBFormatted
 
         """
-
-        arrayFromUSBFormatted = [x.strip() for x in dataFromUSB.strip().split(',')]
+       
+        #rospy.loginfo("Print some data from USB")
+        #rospy.loginfo(dataFromUSB)
+        arrayFromUSBFormatted = [x.strip() for x in dataFromUSB.strip().split(b',')]
 
         return arrayFromUSBFormatted
 
@@ -143,7 +146,7 @@ class dwm1001_localizer:
         for network in networkDataArray:
 
             # check if there is any entry starting with AN, which means there is an anchor
-            if 'AN' in network:
+            if b'AN' in network:
                 # get the number after'AN' which we will use to pubblish topics, example /dwm1001/anchor1
                 temp_anchor_number = networkDataArray[networkDataArray.index(network)]
                 # construct the object for anchor(s)
@@ -166,12 +169,25 @@ class dwm1001_localizer:
                               + " z: "
                               + str(anchor.z))
 
-            elif 'POS' in network:
-
+            elif b'POS' in network:
+            #elif b'POS' and type(network.decode()) != str in network:
+                
+                # TODO: just for debug purpose at the moment    
+                try: 
+                    # construct the object for the tag
+                    tag = Tag(float(networkDataArray[networkDataArray.index(network) + 1]),
+                              float(networkDataArray[networkDataArray.index(network) + 2]),
+                              float(networkDataArray[networkDataArray.index(network) + 3]),)
+                    #rospy.loginf(tag)
+                except:
+                    #rospy.loginfo(tag)
+                    rospy.loginfo("Exception: discard Tag location data!") 
+                    tag = Tag(0, 0, 0,)
+                  
                 # construct the object for the tag
-                tag = Tag(float(networkDataArray[networkDataArray.index(network) + 1]),
-                          float(networkDataArray[networkDataArray.index(network) + 2]),
-                          float(networkDataArray[networkDataArray.index(network) + 3]),)
+                #tag = Tag(float(networkDataArray[networkDataArray.index(network) + 1]),
+                #          float(networkDataArray[networkDataArray.index(network) + 2]),
+                #          float(networkDataArray[networkDataArray.index(network) + 3]),)
 
                 # publish tag
                 pub_anchor = rospy.Publisher('/dwm1001/tag', Tag, queue_size=1)
